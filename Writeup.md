@@ -12,13 +12,14 @@ The goals / steps of this project are the following:
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
 [//]: # (Image References)
-[image1]: ./examples/undist_calib_output.png "Undistorted Calibration Image"
-[image2]: ./examples/undist_test_output.png "Undistorted Test Image"
+[image1]: ./examples/calib_original_to_undist.png "Undistorted Calibration Image"
+[image2]: ./examples/test_original_to_undist.png "Undistorted Test Image"
 [image3]: ./examples/test_undist_to_binary.png "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
+[image4]: ./examples/test_undist_to_warped.png "Warp Example"
 [image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
+[image6]: ./examples/test_undist_to_curvature.png "Lane Curvature and Vehicle Position"
+[image7]: ./examples/test_undist_to_lanelines.png "Output"
+[video1]: ./output_videos/project_video_output.mp4 "Video Output"
 
 ## Rubric Points
 
@@ -34,7 +35,7 @@ You're reading it!
 
 #### Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-The code for this step is contained in the `Camera` class in the third code cell of the IPython notebook located in [Pipeline.ipynb](Pipeline.ipynb).
+The code for this step is contained in the `Camera` class in the third code cell of the IPython notebook located in [`Pipeline.ipynb`](Pipeline.ipynb).
 
 The calibration of the camera is implemented in the `calibrate()` function of the `Camera` class. I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image. Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image. `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.
 
@@ -47,43 +48,57 @@ I then used the output `objpoints` and `imgpoints` to compute the camera calibra
 #### Provide an example of a distortion-corrected image.
 
 To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
+
 ![Undistorted Test Image][image2]
 
 #### Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`). Here's an example of my output for this step:
+I used a combination of color and gradient thresholds to generate a binary image. The code for this step is in the `ImageThresher` class in code cell 8 of the IPython notebook located in [`Pipeline.ipynb`](Pipeline.ipynb). Here is an example of my output for this step:
 
-![alt text][image3]
+![Binary Example][image3]
 
-#### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
+#### Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
+The code for my perspective transform is in the `ImageWarper` class in code cell 9 of the [IPython notebook](Pipeline.ipynb). The `warp_image()` function takes an image (`img`) as input and warps it to a top-down-view. The `unwarp_image()` function takes an image as input (`img`) and warps it vice versa. I chose to hardcode the source and destination points in the following manner:
 
 ```python
-src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
-    [((img_size[0] / 6) - 10), img_size[1]],
-    [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
-dst = np.float32(
-    [[(img_size[0] / 4), 0],
-    [(img_size[0] / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), 0]])
+y_top = 455
+y_bottom = 690
+x_bottom_l = 240
+x_top_l = 585
+x_top_r = 700
+x_bottom_r = 1085
+width, height = image_size
+
+# Using an offset on the left and right side allows the lanes to curve
+offset = 200
+
+src = np.float32([ 
+    [x_bottom_l, y_bottom],
+    [x_top_l, y_top],
+    [x_top_r, y_top],
+    [x_bottom_r, y_bottom]
+])
+dst = np.float32([
+    [offset, height],
+    [offset, 0],
+    [width-offset, 0], 
+    [width-offset, height]
+])
 ```
 
 This resulted in the following source and destination points:
 
-| Source        | Destination   | 
-|:-------------:|:-------------:| 
-| 585, 460      | 320, 0        | 
-| 203, 720      | 320, 720      |
-| 1127, 720     | 960, 720      |
-| 695, 460      | 960, 0        |
+|               | Source        | Destination   | 
+|:-------------:|:-------------:|:-------------:| 
+| Bottom, left  | 240, 690      | 200, 720      | 
+| Top, left     | 585, 455      | 200, 0        |
+| Top, right    | 700, 455      | 1080, 0       |
+| Bottom, right | 1085, 690     | 1080, 720     |
 
 I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
 
-![alt text][image4]
+![Warp Example][image4]
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
@@ -93,21 +108,23 @@ Then I did some other stuff and fit my lane lines with a 2nd order polynomial ki
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+I implemented this step in the function `calculate_lane_curvature_and_vehicle_position()` in code cell 17 of the [IPython notebook](Pipeline.ipynb). Here is an example of my result on a test image:
 
-#### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
+![Lane Curvature and Vehicle Position][image6]
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+#### Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-![alt text][image6]
+I implemented this step in the function `draw_lane_lines_on_image()` in code cell 17 of the [IPython notebook](Pipeline.ipynb). Here is an example of my result on a test image:
+
+![Output][image6]
 
 ---
 
 ### Pipeline (video)
 
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
+#### Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here is a [link to my video result](./output_videos/project_video_output.mp4)
 
 ---
 
